@@ -1,0 +1,27 @@
+sequenceDiagram
+  participant app as Application
+  participant bus as WaveTransport<br/>(RabbitMQWaveTransport)
+  participant rpc as RPCClient
+  participant server as RabbitMQ server
+
+  %% Application sends a Wave query message
+  app ->> +bus: sendQuery({\n  kind: "query",\n  namespace,\n  name,\n  payload,\n  context\n})
+  activate bus
+    alt queryClient not initialized
+      bus ->> bus: setupQueryClient(exchange)
+      bus ->> +rpc: createRPCClient()
+      rpc -->> -bus: rpcClient
+    end
+
+    %% Inject trace context + build CloudEvent envelope
+    bus ->> bus: propagator.inject()
+    bus ->> bus: buildCloudEvent("query", message,\n  extensions = trace context)
+
+    %% RPC flow using rabbitmq-client (request is CloudEvent)
+    bus ->> +rpc: send("wave.queries.{namespace}.{name}", CloudEventV1)
+    rpc ->> +server: BasicPublish(CloudEventV1) + wait for reply
+    server -->> -rpc: BasicDeliver (response)
+    rpc -->> -bus: { body: TResponse }
+
+    bus -->> app: Promise<TResponse>
+  deactivate bus

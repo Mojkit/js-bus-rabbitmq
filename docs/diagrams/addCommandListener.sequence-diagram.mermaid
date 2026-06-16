@@ -1,0 +1,23 @@
+sequenceDiagram
+  participant bus
+  participant CommandListener
+  participant Subscriber
+  participant RabbitMQ
+  participant server as RabbitMQ server
+
+  %% The bus is an instance of whole package
+  bus ->> +CommandListener: constructor(namespace, commandName)
+  CommandListener -->> -bus: commandListener
+  bus ->> CommandListener: add(handler)
+  activate CommandListener
+  CommandListener ->> Subscriber: add()
+    activate Subscriber
+    Subscriber ->> +RabbitMQ: createConsumer()
+    RabbitMQ ->> RabbitMQ: getConsumer()
+    alt queue does not exists
+      RabbitMQ ->> server: subscribe
+      RabbitMQ ->> RabbitMQ: setConsumer()
+      RabbitMQ -->> -Subscriber: consumer
+    end
+    deactivate Subscriber
+  deactivate CommandListener

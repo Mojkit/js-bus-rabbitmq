@@ -1,0 +1,27 @@
+sequenceDiagram
+  participant app as Application
+  participant bus as WaveTransport<br/>(RabbitMQWaveTransport)
+  participant pub as Publisher
+  participant server as RabbitMQ server
+
+  %% Application sends a Wave command message (fire-and-forget)
+  app ->> +bus: sendCommand({\n  kind: "command",\n  namespace,\n  name,\n  payload,\n  context\n})
+  activate bus
+    alt commandPublisher not initialized
+      bus ->> bus: setupCommandPublisher(exchange)
+      bus ->> +pub: createPublisher()
+      pub -->> -bus: commandPublisher
+    end
+
+    %% Inject trace context + build CloudEvent envelope
+    bus ->> bus: propagator.inject()
+    bus ->> bus: buildCloudEvent("command", message,\n  extensions = trace context)
+
+    %% Publish CloudEvent to RabbitMQ via rabbitmq-client Publisher
+    bus ->> +pub: send({ exchange, routingKey: "{namespace}.{name}" }, CloudEventV1)
+    pub ->> +server: BasicPublish(CloudEventV1)
+    server -->> -pub: message sent (ack)
+    pub -->> -bus: Promise<void>
+
+    bus -->> app: Promise<void>
+  deactivate bus

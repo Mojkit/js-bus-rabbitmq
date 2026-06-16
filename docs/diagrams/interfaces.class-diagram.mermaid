@@ -1,0 +1,79 @@
+classDiagram
+%% Base message interface
+    class WaveBaseMessage {
+        +string namespace
+        +string name
+        +TPayload payload
+        +TContext? context
+    }
+
+%% Message type interfaces extending base
+    class WaveCommandMessage {
+        +string kind = "command"
+        +boolean? awaitResponse
+        +TResponse TResponse (typing only)
+    }
+
+    class WaveEventMessage {
+        +string kind = "event"
+    }
+
+    class WaveQueryMessage {
+        +string kind = "query"
+        +TResponse TResponse (typing only)
+    }
+
+%% Options interfaces
+    class WaveSendOptions {
+        +number? timeoutMs
+    }
+
+    class ListenerOptions {
+        +boolean? autoAck
+        +number? maxRetries
+        +number? retryDelayMs
+    }
+
+    class ExecutionContext {
+        +ack() Promise~void~
+        +nack(requeue?) Promise~void~
+        +message Record<string, any>
+    }
+
+%% Transport interface
+    class WaveTransport {
+        +sendCommand~TPayload, TResponse~ Promise~TResponse | void~
+        +sendEvent~TPayload~ Promise~void~
+        +sendQuery~TPayload, TResponse~ Promise~TResponse~
+        +addCommandListener~namespace, name, handler, options~ Promise~Unsubscribe~
+        +addEventListener~namespace, name, handler, options~ Promise~Unsubscribe~
+        +addQueryListener~namespace, name, handler, options~ Promise~Unsubscribe~
+    }
+
+%% Type aliases (shown as notes)
+    class WaveMessageKind {
+        <<type>>
+        'command' | 'event' | 'query'
+    }
+
+    class WaveHandler {
+        <<type>>
+        x(message, context) => Promise~TResponse~
+    }
+
+    class Unsubscribe {
+        <<type>>
+        x() => Promise~void~
+    }
+
+%% Relationships
+    WaveCommandMessage --|> WaveBaseMessage : extends
+    WaveEventMessage --|> WaveBaseMessage : extends
+    WaveQueryMessage --|> WaveBaseMessage : extends
+
+    note for WaveCommandMessage "TResponse exists for typing only; not serialized"
+    note for WaveQueryMessage "TResponse exists for typing only; not serialized"
+
+    note for WaveTransport "Main transport abstraction\non top of RabbitMQ"
+    note for WaveHandler "Handler function type for all message kinds"
+    note for Unsubscribe "Unregister function returned when listener added"

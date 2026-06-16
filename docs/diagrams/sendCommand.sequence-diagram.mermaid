@@ -1,0 +1,28 @@
+sequenceDiagram
+  participant bus
+  participant Command
+  participant Publisher
+  participant RabbitMQ
+  participant server as RabbitMQ server
+
+  %% The bus is an instance of whole package
+  bus ->> +Command: constructor()
+  Command -->> -bus: command
+  bus ->> Command: send()
+  activate Command
+    Command ->> Publisher: send()
+    activate Publisher
+    alt do not await for response
+      Publisher ->> +RabbitMQ: sendCommand()
+      RabbitMQ ->> +server: publish()
+      server -->> -RabbitMQ: message sent
+      RabbitMQ -->> -Publisher: promise
+    else await for response
+      Publisher ->> +RabbitMQ: callCommand()
+      RabbitMQ ->> +server: publish()
+      server -->> -RabbitMQ: response
+      RabbitMQ -->> -Publisher: response
+    end
+    Publisher -->> Command: promise/response
+    deactivate Publisher
+  deactivate Command

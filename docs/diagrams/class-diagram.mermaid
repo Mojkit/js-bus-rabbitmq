@@ -1,0 +1,135 @@
+---
+title: Wave RabbitMQ transport – class diagram
+---
+
+classDiagram
+  %% High-level Wave abstractions
+  WaveTransport <|.. RabbitMQWaveTransport
+  RabbitMQWaveTransport --|> RabbitMQBase
+
+  %% Underlying rabbitmq-client types
+  RabbitMQBase *-- Connection
+  RabbitMQWaveTransport o-- Publisher : eventPublisher
+  RabbitMQWaveTransport o-- Publisher : commandPublisher
+  RabbitMQWaveTransport o-- RPCClient : queryClient
+  RabbitMQWaveTransport ..> CloudEventV1 : uses (future)
+  RabbitMQWaveTransport o-- WaveTracer : tracer
+  RabbitMQBase o-- WaveLogger : logger
+  RabbitMQWaveTransport o-- WavePropagator : propagator
+
+  class WaveTransport {
+    <<interface>>
+    +sendCommand(message: WaveCommandMessage, options?: WaveSendOptions) Promise
+    +sendEvent(message: WaveEventMessage) Promise
+    +sendQuery(message: WaveQueryMessage, options?: WaveSendOptions) Promise
+  }
+
+  class WaveBaseMessage {
+    <<type>>
+    +namespace: string
+    +name: string
+    +payload: any
+    +context?: Record<string, any>
+  }
+
+  class WaveCommandMessage {
+    <<type>>
+    +kind: "command"
+  }
+
+  class WaveEventMessage {
+    <<type>>
+    +kind: "event"
+  }
+
+  class WaveQueryMessage {
+    <<type>>
+    +kind: "query"
+  }
+
+  class WaveSendOptions {
+    <<type>>
+    +timeoutMs?: number
+  }
+
+  class RabbitMQBase {
+    -connection: Connection
+    -logger: WaveLogger
+    -initialized: boolean
+    +constructor(config: RabbitMQConfig, logger: WaveLogger)
+    +init() Promise<void>
+    +shutdown() Promise<void>
+    #createConsumer(...)
+    #createPublisher(...)
+    #createRPCClient(...)
+    #onConnectionEstablished()
+    #onConnectionError(error: Error)
+    #beforeShutdown() Promise<void>
+  }
+
+  class RabbitMQWaveTransport {
+    -eventPublisher?: Publisher
+    -commandPublisher?: Publisher
+    -queryClient?: RPCClient
+    -tracer: WaveTracer
+    -propagator: WavePropagator
+    +constructor(config: RabbitMQConfig, tracer: WaveTracer, logger: WaveLogger, propagator: WavePropagator)
+    +sendCommand(message: WaveCommandMessage, options?: WaveSendOptions) Promise<any>
+    +sendEvent(message: WaveEventMessage) Promise<void>
+    +sendQuery(message: WaveQueryMessage, options?: WaveSendOptions) Promise<any>
+    #setupEventPublisher(exchange: string) Promise<void>
+    #setupCommandPublisher(exchange: string) Promise<void>
+    #setupQueryClient(exchange: string) Promise<void>
+    #onConnectionEstablished()
+    #beforeShutdown() Promise<void>
+  }
+
+  class WaveTracer {
+    <<interface>>
+    +startActiveSpan(name: string, fn: () => Promise<any>) Promise<any>
+  }
+
+  class WaveLogger {
+    <<interface>>
+    +debug(message: string, meta?: Record<string, unknown>) void
+    +info(message: string, meta?: Record<string, unknown>) void
+    +warn(message: string, meta?: Record<string, unknown>) void
+    +error(message: string, meta?: Record<string, unknown>) void
+  }
+
+  class WavePropagator {
+    <<interface>>
+    +inject() Record<string, string>
+  }
+
+  class CloudEventV1 {
+    <<type>>
+    +specversion: "1.0"
+    +id: string
+    +source: string
+    +type: string
+    +subject?: string
+    +time?: string
+    +datacontenttype?: string
+    +dataschema?: string
+    +data?: any
+    +extensions?: Record<string, any>
+  }
+
+  class RabbitMQConfig {
+    +url: string
+    +prefetchCount?: number
+    +reconnect?: boolean
+  }
+
+  class Connection {
+    <<from rabbitmq-client>>
+  }
+
+  class Publisher {
+    <<from rabbitmq-client>>
+  }
+
+  class RPCClient {
+    <<from rabbitmq-client>>
+  }

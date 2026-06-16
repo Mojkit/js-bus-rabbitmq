@@ -1,0 +1,23 @@
+sequenceDiagram
+  participant bus
+  participant EventListener
+  participant Subscriber
+  participant RabbitMQ
+  participant server as RabbitMQ server
+  %% The bus is an instance of whole package
+  bus ->> +EventListener: constructor(namespace, eventName)
+  EventListener -->> -bus: eventListener
+  bus ->> EventListener: cancel()
+  activate EventListener
+    EventListener ->> +Subscriber: cancel()
+    Subscriber ->> RabbitMQ: cancelConsumer()
+    activate RabbitMQ
+    RabbitMQ ->> RabbitMQ: getConsumer()
+      alt queue exists
+        RabbitMQ ->> server: cancel()
+        RabbitMQ ->> RabbitMQ: deleteConsumer()
+      end
+      RabbitMQ -->> Subscriber: Promise
+      deactivate RabbitMQ
+      Subscriber -->> -EventListener: Promise
+  deactivate EventListener

@@ -1,0 +1,21 @@
+sequenceDiagram
+  participant bus
+  participant Query
+  participant Publisher
+  participant RabbitMQ
+  participant server as RabbitMQ server
+
+  %% The bus is an instance of whole package
+  bus ->> +Query: constructor()
+  Query -->> -bus: query
+  bus ->> Query: send()
+  activate Query
+    Query ->> Publisher: send()
+    activate Publisher
+      Publisher ->> +RabbitMQ: callQuery()
+      RabbitMQ ->> +server: publish()
+      server -->> -RabbitMQ: response
+      RabbitMQ -->> -Publisher: response
+      Publisher -->> Query: response
+    deactivate Publisher
+  deactivate Query
